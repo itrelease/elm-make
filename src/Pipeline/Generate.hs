@@ -66,7 +66,7 @@ generate config dependencies natives rootModules =
             liftIO $
               do  js <- mapM File.readTextUtf8 objectFiles
                   let (Just (CanonicalModule _ moduleName)) = Maybe.listToMaybe rootModules
-                  let outputText = html (Text.concat (header:js)) moduleName
+                  let outputText = html (Text.concat (plainHeader:js)) moduleName
                   LazyText.writeFile outputFile outputText
 
         BM.JS outputFile ->
@@ -75,13 +75,36 @@ generate config dependencies natives rootModules =
               do  Text.hPutStrLn handle header
                   forM_ objectFiles $ \jsFile ->
                       Text.hPutStrLn handle =<< File.readTextUtf8 jsFile
+                  Text.hPutStrLn handle bottom
 
       liftIO (putStrLn ("Successfully generated " ++ outputFile))
 
 
+plainHeader :: Text.Text
+plainHeader =
+    "var Elm = Elm || { Native: {} };"
+
 header :: Text.Text
 header =
-    "var Elm = Elm || { Native: {} };"
+    "(function() {\n\
+    \var Elm = Elm || { Native: {} };"
+
+bottom :: Text.Text
+bottom =
+    "\nif (typeof define === 'function' && define.amd) {\n\
+    \  define([], function() {\n\
+    \    return Elm;\n\
+    \  });\n\
+    \} else if (typeof module === 'object') {\n\
+    \  module.exports = Elm;\n\
+    \} else {\n\
+    \  if (typeof this.Elm === 'undefined') {\n\
+    \    this.Elm = Elm;\n\
+    \  } else {\n\
+    \    throw new Error('This page is trying to import multiple compiled Elm programs using the same `Elm` global object, which would cause conflicts. This can be resolved by using a module loader like RequireJS to import the compiled Elm programs into different objects.');\n\
+    \  }\n\
+    \}\n\
+    \}).call(this);"
 
 
 setupNodes
