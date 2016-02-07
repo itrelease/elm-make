@@ -33,6 +33,7 @@ data Config = Config
 data Output
     = Html FilePath
     | JS FilePath
+    | DevNull
 
 
 outputFilePath :: Config -> FilePath
@@ -40,6 +41,7 @@ outputFilePath config =
   case _output config of
     Html file -> file
     JS file -> file
+    DevNull -> "/dev/null"
 
 
 artifactDirectory :: FilePath
@@ -143,7 +145,8 @@ printError :: Error -> IO ()
 printError err =
   case err of
     CompilerErrors path source errors ->
-        mapM_ (Compiler.printError stderr Compiler.dummyLocalizer path source) errors
+        do  isTerminal <- Report.checkIsTerminal
+            mapM_ (Report.printError isTerminal Compiler.dummyLocalizer path source) errors
 
     CorruptedArtifact filePath ->
         hPutStrLn stderr $
@@ -170,7 +173,7 @@ printError err =
 
     ModuleNotFound name maybeParent ->
         hPutStrLn stderr $
-          "I cannot find find module '" ++ Module.nameToString name ++ "'.\n"
+          "I cannot find module '" ++ Module.nameToString name ++ "'.\n"
           ++ "\n"
           ++ toContext maybeParent
           ++ "\n"
@@ -218,16 +221,20 @@ drawCycle :: [TMP.CanonicalModule] -> String
 drawCycle modules =
   let
     topLine=
-        "  ┌─────┐"
+        [ "  ┌─────┐"
+        , "  │     V"
+        ]
 
     line (TMP.CanonicalModule _ name) =
-        "  │    " ++ Module.nameToString name
+        [ "  │    " ++ Module.nameToString name ]
 
     midLine =
-        "  │     ↓"
+        [ "  │     │"
+        , "  │     V"
+        ]
 
     bottomLine =
         "  └─────┘"
   in
-    unlines (topLine : List.intersperse midLine (map line modules) ++ [ bottomLine ])
+    unlines (topLine ++ List.intercalate midLine (map line modules) ++ [ bottomLine ])
 
